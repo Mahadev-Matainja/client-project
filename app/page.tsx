@@ -3,7 +3,7 @@
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import Loader from "@/components/ui/loader";
-import HomePageDashboard from "./(public)/page";
+import HomePageDashboard from "@/components/HomePageDashboard";
 import CookieConsent from "./Cookies";
 
 export default function HomePage() {
