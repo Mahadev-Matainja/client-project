@@ -60,20 +60,20 @@ export default function HeaderWithAuth({
               />
             </div>
             <nav className="hidden md:flex items-center space-x-8">
-              <Link
+              {/* <Link
                 href="#services"
                 className="text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Services
-              </Link>
+              </Link> */}
               <Link
-                href="#about"
+                href="/about-us"
                 className="text-gray-600 hover:text-blue-600 transition-colors"
               >
                 About
               </Link>
               <Link
-                href="#contact"
+                href="/contact"
                 className="text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Contact

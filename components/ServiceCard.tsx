@@ -72,7 +72,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           )}
         </div>
 
-        <CardTitle className="text-2xl text-gray-900 ">{title}</CardTitle>
+        <CardTitle className="text-lg text-gray-900 ">{title}</CardTitle>
         <CardDescription className="text-gray-600">
           {description}
         </CardDescription>

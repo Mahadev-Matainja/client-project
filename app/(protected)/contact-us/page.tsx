@@ -73,7 +73,7 @@ const ContactPage: React.FC = () => {
     <MainLayout>
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <section className="bg-gradient-to-br from-purple-100 via-purple-300 to-indigo-300 rounded-b-[80px]">
+        <section className="bg-liner-to-br from-purple-100 via-purple-300 to-indigo-300 rounded-b-[80px]">
           <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row items-center justify-between">
             <div className="text-center md:text-left md:w-1/2">
               <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3">

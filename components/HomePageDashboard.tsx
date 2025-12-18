@@ -86,7 +86,7 @@ export default function HomePageDashboard() {
               <div className="max-w-9xl mx-auto px-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
                   {/* LEFT CARD */}
-                  <div className="border-2 border-pink-300 rounded-2xl p-6 bg-pink-50 text-center h-full flex flex-col">
+                  <div className="border-2 border-pink-300 rounded-2xl p-6 bg-pink-50 text-center h-full flex flex-col cursor-pointer">
                     <p className="italic text-red-500 mb-2">for</p>
 
                     <h2 className="text-2xl font-bold mb-6">
@@ -126,7 +126,7 @@ export default function HomePageDashboard() {
                   </div>
 
                   {/* RIGHT CARD */}
-                  <div className="border-2 border-blue-300 rounded-2xl p-6 bg-blue-50 text-center h-full flex flex-col">
+                  <div className="border-2 border-blue-300 rounded-2xl p-6 bg-blue-50 text-center h-full flex flex-col cursor-pointer">
                     <p className="italic text-blue-500 mb-2">for</p>
 
                     <h2 className="text-2xl font-bold mb-6">

@@ -13,6 +13,7 @@ const libraries = ["places"] as const;
 interface Props {
   lat: number;
   lng: number;
+  height?: string;
   onLocationSelect: (
     lat: number,
     lng: number,
@@ -113,7 +114,10 @@ const LocationPickerMap = ({ lat, lng, onLocationSelect }: Props) => {
       <GoogleMap
         zoom={14}
         center={center}
-        mapContainerStyle={{ width: "100%", height: "350px" }}
+        mapContainerStyle={{
+          width: "100%",
+          height: window.innerWidth < 768 ? "160px" : "220px",
+        }}
         onClick={handleMapClick}
       >
         <Marker position={marker} />

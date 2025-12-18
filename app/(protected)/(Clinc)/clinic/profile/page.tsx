@@ -16,13 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
@@ -30,26 +23,70 @@ import api from "@/utils/api";
 import { useDispatch } from "react-redux";
 import { setAuthUpdate } from "@/lib/slices/authSlice";
 import ProfileSkeleton from "@/components/ProfileSkeleton";
+import LocationPickerMap from "@/components/LocationPickerMap";
+
+// ------------ TYPES ------------
+interface PersonalInfo {
+  firstName: string;
+  email: string;
+  address: string;
+  alt_no: string;
+  avatar: string;
+  phone: string;
+  provider_id: string;
+  pincode: string;
+  registrationNumber: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+interface Notifications {
+  email: boolean;
+  sms: boolean;
+  push: boolean;
+}
+
+interface Privacy {
+  shareWithDoctors: boolean;
+  anonymousData: boolean;
+}
+
+interface Errors {
+  firstName: string;
+  address: string;
+  pincode: string;
+  registrationNumber: string;
+}
+
+interface LocationData {
+  lat: number;
+  lng: number;
+  pincode: string;
+  address: string;
+}
 
 // ------------ DEFAULT STATES ------------
-const defaultPersonalInfo = {
+const defaultPersonalInfo: PersonalInfo = {
   firstName: "",
-  lastName: "",
   email: "",
   address: "",
   alt_no: "",
   avatar: "",
   phone: "",
   provider_id: "",
+  pincode: "",
+  registrationNumber: "",
+  latitude: 22.5726,
+  longitude: 88.3639,
 };
 
-const defaultNotifications = {
+const defaultNotifications: Notifications = {
   email: false,
   sms: false,
   push: false,
 };
 
-const defaultPrivacy = {
+const defaultPrivacy: Privacy = {
   shareWithDoctors: false,
   anonymousData: false,
 };
@@ -62,14 +99,17 @@ const ProfileSettingsPage: React.FC = () => {
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [personalInfo, setPersonalInfo] = useState(defaultPersonalInfo);
-  const [notifications, setNotifications] = useState(defaultNotifications);
-  const [privacy, setPrivacy] = useState(defaultPrivacy);
+  const [personalInfo, setPersonalInfo] =
+    useState<PersonalInfo>(defaultPersonalInfo);
+  const [notifications, setNotifications] =
+    useState<Notifications>(defaultNotifications);
+  const [privacy, setPrivacy] = useState<Privacy>(defaultPrivacy);
   const [loading, setLoading] = useState(true);
-
-  const [errors, setErrors] = useState({
+  const [errors, setErrors] = useState<Errors>({
     firstName: "",
     address: "",
+    pincode: "",
+    registrationNumber: "",
   });
 
   const BASE_URL =
@@ -80,8 +120,8 @@ const ProfileSettingsPage: React.FC = () => {
     const fetchProfileData = async () => {
       try {
         setLoading(true);
-
         const response = await api.get("/clinic/profile/show");
+
         if (!response.data.success) {
           toast({
             title: "Error",
@@ -92,44 +132,44 @@ const ProfileSettingsPage: React.FC = () => {
         }
 
         const data = response.data.data;
+        const basic = data.basic_details || {};
+        const personal = data.personal_information || {};
 
-        // --- SET AVATAR ---
-        setAvatarUrl(
-          data.basic_details.avatar
-            ? `${BASE_URL}/${data.basic_details.avatar}`
-            : ""
-        );
+        // Set avatar URL
+        setAvatarUrl(basic.avatar ? `${BASE_URL}/${basic.avatar}` : "");
 
-        // --- SET PERSONAL INFO ---
+        // Set personal info - ensure all string values are not undefined
         setPersonalInfo({
-          firstName: data.basic_details.first_name || "",
-          lastName: data.basic_details.last_name || "",
-          email: data.basic_details.email || "",
-          phone: data.basic_details.phone || "",
-          provider_id: data.basic_details.provider_id || "",
-          avatar: data.basic_details.avatar || "",
-
-          // API DOES NOT SEND THESE — give safe defaults
-          address: data.personal_information.address || "",
-          alt_no: data.personal_information.alt_no || "",
+          firstName: basic.first_name || "",
+          email: basic.email || "",
+          phone: basic.phone || "",
+          provider_id: basic.provider_id || "",
+          avatar: basic.avatar || "",
+          address: personal.address || "",
+          alt_no: personal.alt_no || "",
+          pincode: personal.pincode || "",
+          registrationNumber: personal.registrationNumber || "",
+          latitude: personal.latitude || 22.5726,
+          longitude: personal.longitude || 88.3639,
         });
 
-        // --- SET NOTIFICATIONS ---
+        // Set notifications
         setNotifications({
-          email: data.notifications.email,
-          sms: data.notifications.sms,
-          push: data.notifications.push,
+          email: data.notifications?.email || false,
+          sms: data.notifications?.sms || false,
+          push: data.notifications?.push || false,
         });
 
-        // --- SET PRIVACY ---
+        // Set privacy
         setPrivacy({
-          shareWithDoctors: data.privacy.shareWithDoctors,
-          anonymousData: data.privacy.anonymousData,
+          shareWithDoctors: data.privacy?.shareWithDoctors || false,
+          anonymousData: data.privacy?.anonymousData || false,
         });
-      } catch (err) {
+      } catch (err: any) {
+        console.error("Fetch error:", err);
         toast({
           title: "Error",
-          description: "Failed to fetch profile.",
+          description: err.message || "Failed to fetch profile.",
           variant: "destructive",
         });
       } finally {
@@ -141,19 +181,30 @@ const ProfileSettingsPage: React.FC = () => {
   }, []);
 
   // ------------ HANDLE INPUTS ------------
-  const handleInputChange = (
-    section: "personalInfo" | "notifications" | "privacy",
-    key: string,
-    value: any
+  const handlePersonalInfoChange = (
+    key: keyof PersonalInfo,
+    value: string | number
   ) => {
-    if (section === "personalInfo")
-      setPersonalInfo((prev) => ({ ...prev, [key]: value }));
+    setPersonalInfo((prev) => ({
+      ...prev,
+      [key]: value !== undefined && value !== null ? value.toString() : "",
+    }));
 
-    if (section === "notifications")
-      setNotifications((prev) => ({ ...prev, [key]: value }));
+    // Clear error when user types
+    if (errors[key as keyof Errors]) {
+      setErrors((prev) => ({ ...prev, [key]: "" }));
+    }
+  };
 
-    if (section === "privacy")
-      setPrivacy((prev) => ({ ...prev, [key]: value }));
+  const handleNotificationChange = (
+    key: keyof Notifications,
+    value: boolean
+  ) => {
+    setNotifications((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handlePrivacyChange = (key: keyof Privacy, value: boolean) => {
+    setPrivacy((prev) => ({ ...prev, [key]: value }));
   };
 
   // ------------ HANDLE AVATAR UPLOAD ------------
@@ -176,382 +227,492 @@ const ProfileSettingsPage: React.FC = () => {
     setAvatarUrl(URL.createObjectURL(file));
   };
 
+  // ------------ HANDLE LOCATION SELECT ------------
+
+  const handleLocationSelect = (
+    lat: number,
+    lng: number,
+    pincode: string,
+    address: string
+  ) => {
+    setPersonalInfo((prev) => ({
+      ...prev,
+      address,
+      pincode,
+      latitude: lat,
+      longitude: lng,
+    }));
+
+    if (errors.address || errors.pincode) {
+      setErrors((prev) => ({
+        ...prev,
+        address: "",
+        pincode: "",
+      }));
+    }
+  };
+
+  // ------------ VALIDATION ------------
+  const validateForm = (): boolean => {
+    const newErrors: Errors = {
+      firstName: "",
+      address: "",
+      pincode: "",
+      registrationNumber: "",
+    };
+
+    let isValid = true;
+
+    if (!personalInfo.firstName.trim()) {
+      newErrors.firstName = "First Name is required";
+      isValid = false;
+    }
+
+    if (!personalInfo.address.trim()) {
+      newErrors.address = "Address is required";
+      isValid = false;
+    }
+
+    if (!personalInfo.pincode || personalInfo.pincode.length !== 6) {
+      newErrors.pincode = "Pin Code must be 6 digits";
+      isValid = false;
+    }
+
+    if (!personalInfo.registrationNumber.trim()) {
+      newErrors.registrationNumber = "Registration Number is required";
+      isValid = false;
+    }
+
+    setErrors(newErrors);
+    return isValid;
+  };
+
   // ------------ SAVE ------------
   const handleSave = async () => {
-    const newErrors: any = {};
-
-    if (!personalInfo.firstName.trim())
-      newErrors.firstName = " First Name isRequired";
-    if (!personalInfo.address.trim())
-      newErrors.address = "  Address is Required";
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
+    if (!validateForm()) {
       toast({
         title: "Validation Error",
-        description: "Required fields missing",
+        description: "Please fill all required fields correctly",
         variant: "destructive",
       });
       return;
     }
 
-    setErrors({ firstName: "", address: "" });
-
     try {
       const formData = new FormData();
 
-      const allowedFields = [
-        "firstName",
-        "lastName",
-        "email",
-        "address",
-        "alt_no",
-      ];
-
-      allowedFields.forEach((key) => {
-        formData.append(
-          key,
-          personalInfo[key as keyof typeof personalInfo] || ""
-        );
+      // Add all personal info fields (except avatar which is handled separately)
+      Object.entries(personalInfo).forEach(([key, value]) => {
+        if (key !== "avatar" && value !== undefined && value !== null) {
+          // Convert to string for formData
+          formData.append(key, value.toString());
+        }
       });
 
-      if (avatarFile) formData.append("avatar", avatarFile);
+      // Log form data before sending
+      console.log("FormData contents:");
+      formData.forEach((value, key) => {
+        console.log(key, ":", value);
+      });
+
+      if (avatarFile) {
+        formData.append("avatar", avatarFile);
+        console.log("Avatar appended to formData");
+      }
 
       const response = await api.post("/clinic/profile/update", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
+      console.log("Save response:", response.data); // Debug log
+
       if (response.data.success) {
         const updatedUser = response.data;
-        const { customer, token } = updatedUser?.data;
-        dispatch(setAuthUpdate({ user: customer, token }));
+        const { customer, token } = updatedUser?.data || {};
+
+        if (customer && token) {
+          dispatch(setAuthUpdate({ user: customer, token }));
+        }
+
         toast({
           title: "Success",
-          description: "Profile updated",
+          description: "Profile updated successfully",
         });
         setIsEditing(false);
+
+        // Reset avatar file after successful save
+        setAvatarFile(null);
+      } else {
+        throw new Error(response.data.message || "Update failed");
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("Save error:", err);
       toast({
         title: "Error",
-        description: "Update failed",
+        description: err.message || "Update failed",
         variant: "destructive",
       });
     }
   };
 
-  // ------------ UI ------------
+  // ------------ RENDER ------------
+  if (loading) {
+    return (
+      <MainLayout>
+        <ProfileSkeleton />
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
-      {loading ? (
-        <ProfileSkeleton />
-      ) : (
-        <div className="space-y-8">
-          {/* HEADER */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold">Profile Settings</h1>
-              <p className="text-gray-600">Manage your personal details</p>
-            </div>
-
-            {isEditing ? (
-              <div className="flex gap-3">
-                <Button variant="outline" onClick={() => setIsEditing(false)}>
-                  Cancel
-                </Button>
-                <Button className="gap-2" onClick={handleSave}>
-                  <Save className="h-4 w-4" /> Save Changes
-                </Button>
-              </div>
-            ) : (
-              <Button className="gap-2" onClick={() => setIsEditing(true)}>
-                <Edit className="h-4 w-4" /> Edit Profile
-              </Button>
-            )}
+      <div className="space-y-8">
+        {/* HEADER */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Profile Settings</h1>
+            <p className="text-gray-600">Manage your personal details</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* LEFT SIDE */}
-            <div className="space-y-6">
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <div className="relative inline-block mb-4">
-                    <Avatar className="h-24 w-24">
-                      <AvatarImage src={avatarUrl || "/noProfileImage.png"} />
-                      <AvatarFallback>
-                        {personalInfo.firstName?.[0] || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    {isEditing && (
-                      <>
-                        <Button
-                          size="sm"
-                          className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0"
-                          onClick={handleCameraClick}
-                        >
-                          <Camera className="h-4 w-4" />
-                        </Button>
-
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileChange}
-                          className="hidden"
-                        />
-                      </>
-                    )}
-                  </div>
-
-                  <h2 className="text-xl font-bold">
-                    {personalInfo.firstName} {personalInfo.lastName}
-                  </h2>
-                  <p>{personalInfo.email}</p>
-                  <p>{personalInfo.phone}</p>
-
-                  <div className="flex justify-center gap-2 mt-3">
-                    <Badge variant="outline">Verified</Badge>
-                    <Badge variant="outline">
-                      Clinic ID: {personalInfo.provider_id}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* SUBSCRIPTION */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Crown className="h-5 w-5 text-yellow-600" /> Subscription
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex justify-between">
-                    <span>Plan</span>
-                    <Badge>Premium</Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Status</span>
-                    <Badge className="bg-green-100 text-green-800">
-                      Active
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Next Billing</span>
-                    <span>2025-02-15</span>
-                  </div>
-                  <Button variant="outline" className="w-full gap-2">
-                    <Star className="h-4 w-4" /> Upgrade Plan
-                  </Button>
-                </CardContent>
-              </Card>
+          {isEditing ? (
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button className="gap-2" onClick={handleSave}>
+                <Save className="h-4 w-4" /> Save Changes
+              </Button>
             </div>
+          ) : (
+            <Button className="gap-2" onClick={() => setIsEditing(true)}>
+              <Edit className="h-4 w-4" /> Edit Profile
+            </Button>
+          )}
+        </div>
 
-            {/* RIGHT SIDE */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* PERSONAL INFO */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <User className="h-5 w-5" /> Personal Information
-                  </CardTitle>
-                  <CardDescription>Update your details</CardDescription>
-                </CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* LEFT SIDE */}
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6 text-center">
+                <div className="relative inline-block mb-4">
+                  <Avatar className="h-24 w-24">
+                    <AvatarImage src={avatarUrl || "/noProfileImage.png"} />
+                    <AvatarFallback>
+                      {personalInfo.firstName?.[0]?.toUpperCase() || "U"}
+                    </AvatarFallback>
+                  </Avatar>
 
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* FIRST NAME */}
-                    <div className="space-y-2">
-                      <Label>
-                        First Name <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        value={personalInfo.firstName}
-                        disabled={!isEditing}
-                        onChange={(e) => {
-                          setErrors({ ...errors, firstName: "" });
-                          handleInputChange(
-                            "personalInfo",
-                            "firstName",
-                            e.target.value
-                          );
-                        }}
+                  {isEditing && (
+                    <>
+                      <Button
+                        size="sm"
+                        className="absolute -bottom-2 -right-2 rounded-full h-8 w-8 p-0"
+                        onClick={handleCameraClick}
+                      >
+                        <Camera className="h-4 w-4" />
+                      </Button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
                       />
-                      {errors.firstName && (
-                        <p className="text-red-500 text-sm">
-                          {errors.firstName}
-                        </p>
-                      )}
-                    </div>
+                    </>
+                  )}
+                </div>
 
-                    {/* LAST NAME */}
-                    <div className="space-y-2">
-                      <Label>Last Name</Label>
-                      <Input
-                        value={personalInfo.lastName}
-                        disabled={!isEditing}
-                        onChange={(e) =>
-                          handleInputChange(
-                            "personalInfo",
-                            "lastName",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
+                <h2 className="text-xl font-bold">
+                  {personalInfo.firstName || "User"}
+                </h2>
+                <p className="text-gray-600">
+                  {personalInfo.email || "No email"}
+                </p>
+                <p className="text-gray-600">
+                  {personalInfo.phone || "No phone"}
+                </p>
 
-                    {/* ALT NO */}
-                    <div className="space-y-2">
-                      <Label>Alternative Number</Label>
-                      <div className="flex">
-                        <span className="flex items-center justify-center bg-gray-200 text-gray-700 px-3 rounded-l-md border">
-                          +91
-                        </span>
-                        <Input
-                          value={personalInfo.alt_no}
-                          disabled={!isEditing}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Allow only numbers and limit to 10 digits
-                            const numericValue = value
-                              .replace(/\D/g, "")
-                              .slice(0, 10);
-                            handleInputChange(
-                              "personalInfo",
-                              "alt_no",
-                              numericValue
-                            );
-                          }}
-                          placeholder="Enter 10-digit number"
-                          className="rounded-l-none"
-                        />
-                      </div>
+                <div className="flex justify-center gap-2 mt-3">
+                  <Badge variant="outline">Verified</Badge>
+                  <Badge variant="outline">
+                    Clinic ID: {personalInfo.provider_id || "N/A"}
+                  </Badge>
+                </div>
+              </CardContent>
+            </Card>
 
-                      {personalInfo.alt_no &&
-                        personalInfo.alt_no.length !== 10 && (
-                          <p className="text-sm text-red-500">
-                            Please enter exactly 10 digits
-                          </p>
-                        )}
-                    </div>
-                  </div>
+            {/* SUBSCRIPTION */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-yellow-600" /> Subscription
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between">
+                  <span>Plan</span>
+                  <Badge>Premium</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Status</span>
+                  <Badge className="bg-green-100 text-green-800">Active</Badge>
+                </div>
+                <div className="flex justify-between">
+                  <span>Next Billing</span>
+                  <span>2025-02-15</span>
+                </div>
+                <Button variant="outline" className="w-full gap-2">
+                  <Star className="h-4 w-4" /> Upgrade Plan
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
 
-                  {/* ADDRESS */}
+          {/* RIGHT SIDE */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* PERSONAL INFO */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" /> Personal Information
+                </CardTitle>
+                <CardDescription>Update your details</CardDescription>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* FIRST NAME */}
                   <div className="space-y-2">
                     <Label>
-                      Address <span className="text-red-500">*</span>
+                      Clinic Name <span className="text-red-500">*</span>
                     </Label>
-
-                    <Textarea
-                      rows={2}
+                    <Input
+                      value={personalInfo.firstName || ""}
                       disabled={!isEditing}
-                      value={personalInfo.address}
-                      onChange={(e) => {
-                        setErrors({ ...errors, address: "" });
-                        handleInputChange(
-                          "personalInfo",
-                          "address",
-                          e.target.value
-                        );
-                      }}
+                      onChange={(e) =>
+                        handlePersonalInfoChange("firstName", e.target.value)
+                      }
+                      placeholder="Enter first name"
                     />
-
-                    {errors.address && (
-                      <p className="text-red-500 text-sm">{errors.address}</p>
+                    {errors.firstName && (
+                      <p className="text-red-500 text-sm">{errors.firstName}</p>
                     )}
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* PRIVACY + NOTIFICATIONS */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Shield className="h-5 w-5 text-green-500" /> Privacy &
-                    Notifications
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* NOTIFICATIONS */}
-                  <div className="space-y-3">
-                    <Label className="font-medium">Notifications</Label>
-
-                    {["email", "sms", "push"].map((key) => (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {key === "sms"
-                              ? "SMS Notifications"
-                              : key === "push"
-                              ? "Push Notifications"
-                              : "Email Notifications"}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {key === "sms"
-                              ? "Urgent alerts via SMS"
-                              : key === "push"
-                              ? "Get app alerts"
-                              : "Receive updates via email"}
-                          </p>
-                        </div>
-
-                        <Switch
-                          checked={
-                            notifications[key as keyof typeof notifications]
-                          }
-                          disabled={!isEditing}
-                          onCheckedChange={(checked) =>
-                            handleInputChange("notifications", key, checked)
-                          }
-                        />
-                      </div>
-                    ))}
+                  {/* ALT NO */}
+                  <div className="space-y-2">
+                    <Label>Alternative Number</Label>
+                    <div className="flex">
+                      <span className="flex items-center justify-center bg-gray-200 text-gray-700 px-3 rounded-l-md border">
+                        +91
+                      </span>
+                      <Input
+                        value={personalInfo.alt_no || ""}
+                        disabled={!isEditing}
+                        onChange={(e) => {
+                          const value = e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10);
+                          handlePersonalInfoChange("alt_no", value);
+                        }}
+                        placeholder="Enter 10-digit number"
+                        className="rounded-l-none"
+                      />
+                    </div>
+                    {personalInfo.alt_no &&
+                      personalInfo.alt_no.length !== 10 && (
+                        <p className="text-sm text-red-500">
+                          Please enter exactly 10 digits
+                        </p>
+                      )}
                   </div>
 
-                  <Separator />
-
-                  {/* PRIVACY */}
-                  <div className="space-y-3">
-                    <Label className="font-medium">Privacy</Label>
-
-                    {["shareWithDoctors", "anonymousData"].map((key) => (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {key === "shareWithDoctors"
-                              ? "Share with Doctors"
-                              : "Anonymous Data Sharing"}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            {key === "shareWithDoctors"
-                              ? "Allow doctors to view your records"
-                              : "Share anonymized health data"}
-                          </p>
-                        </div>
-
-                        <Switch
-                          checked={privacy[key as keyof typeof privacy]}
-                          disabled={!isEditing}
-                          onCheckedChange={(checked) =>
-                            handleInputChange("privacy", key, checked)
-                          }
-                        />
-                      </div>
-                    ))}
+                  {/* PINCODE */}
+                  <div className="space-y-2">
+                    <Label>
+                      Pin Code <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      value={personalInfo.pincode || ""}
+                      disabled={!isEditing}
+                      inputMode="numeric"
+                      maxLength={6}
+                      onChange={(e) =>
+                        handlePersonalInfoChange(
+                          "pincode",
+                          e.target.value.replace(/\D/g, "").slice(0, 6)
+                        )
+                      }
+                      placeholder="Enter 6-digit pin code"
+                    />
+                    {errors.pincode && (
+                      <p className="text-red-500 text-sm">{errors.pincode}</p>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+
+                  {/* REGISTRATION NUMBER */}
+                  <div className="space-y-2">
+                    <Label>
+                      Registration Number{" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      value={personalInfo.registrationNumber || ""}
+                      disabled={!isEditing}
+                      onChange={(e) =>
+                        handlePersonalInfoChange(
+                          "registrationNumber",
+                          e.target.value
+                        )
+                      }
+                      placeholder="e.g. WBMC/2022/45678"
+                    />
+                    {errors.registrationNumber && (
+                      <p className="text-red-500 text-sm">
+                        {errors.registrationNumber}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* ADDRESS */}
+                <div className="space-y-2">
+                  <Label>
+                    Address <span className="text-red-500">*</span>
+                  </Label>
+                  <Textarea
+                    rows={2}
+                    disabled={!isEditing}
+                    value={personalInfo.address || ""}
+                    onChange={(e) =>
+                      handlePersonalInfoChange("address", e.target.value)
+                    }
+                    placeholder="Enter your address"
+                  />
+                  {errors.address && (
+                    <p className="text-red-500 text-sm">{errors.address}</p>
+                  )}
+                </div>
+
+                {/* LOCATION PICKER */}
+                {isEditing && (
+                  <div className="space-y-2">
+                    <Label>Select Location on Map</Label>
+                    <p className="text-sm text-gray-600">
+                      Click on the map to automatically fill address and
+                      pincode.
+                    </p>
+                    {/* Map - Using current location from form */}
+                    <LocationPickerMap
+                      lat={Number(personalInfo.latitude)}
+                      lng={Number(personalInfo.longitude)}
+                      height="180px"
+                      onLocationSelect={handleLocationSelect}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* PRIVACY + NOTIFICATIONS */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-500" /> Privacy &
+                  Notifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* NOTIFICATIONS */}
+                <div className="space-y-3">
+                  <Label className="font-medium">Notifications</Label>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Email Notifications</p>
+                      <p className="text-sm text-gray-600">
+                        Receive updates via email
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.email}
+                      disabled={!isEditing}
+                      onCheckedChange={(checked) =>
+                        handleNotificationChange("email", checked)
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">SMS Notifications</p>
+                      <p className="text-sm text-gray-600">
+                        Urgent alerts via SMS
+                      </p>
+                    </div>
+                    <Switch
+                      checked={notifications.sms}
+                      disabled={!isEditing}
+                      onCheckedChange={(checked) =>
+                        handleNotificationChange("sms", checked)
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Push Notifications</p>
+                      <p className="text-sm text-gray-600">Get app alerts</p>
+                    </div>
+                    <Switch
+                      checked={notifications.push}
+                      disabled={!isEditing}
+                      onCheckedChange={(checked) =>
+                        handleNotificationChange("push", checked)
+                      }
+                    />
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* PRIVACY */}
+                <div className="space-y-3">
+                  <Label className="font-medium">Privacy</Label>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Share with Doctors</p>
+                      <p className="text-sm text-gray-600">
+                        Allow doctors to view your records
+                      </p>
+                    </div>
+                    <Switch
+                      checked={privacy.shareWithDoctors}
+                      disabled={!isEditing}
+                      onCheckedChange={(checked) =>
+                        handlePrivacyChange("shareWithDoctors", checked)
+                      }
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium">Anonymous Data Sharing</p>
+                      <p className="text-sm text-gray-600">
+                        Share anonymized health data
+                      </p>
+                    </div>
+                    <Switch
+                      checked={privacy.anonymousData}
+                      disabled={!isEditing}
+                      onCheckedChange={(checked) =>
+                        handlePrivacyChange("anonymousData", checked)
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
-      )}
+      </div>
     </MainLayout>
   );
 };

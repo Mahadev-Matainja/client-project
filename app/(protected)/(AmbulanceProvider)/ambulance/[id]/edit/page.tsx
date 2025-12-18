@@ -29,7 +29,7 @@ import EditAmbulanceShimmer from "./components/EditAmbulanceSkeleton";
 
 /* ---------------- EQUIPMENT OPTIONS ---------------- */
 const equipmentOptions = [
-  { id: "available", label: "Currently Available" },
+  { id: "is_available", label: "Currently Available" },
   { id: "ac", label: "AC" },
   { id: "oxygen_cylinder", label: "Oxygen Cylinder" },
   { id: "first_aid_kit", label: "First Aid Kit" },

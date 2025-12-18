@@ -66,6 +66,11 @@ export const menuMap = {
         path: "/clinic/profile",
         icon: User,
       },
+      // {
+      //   label: "Doctor List",
+      //   path: "/clinic/doctor-list",
+      //   icon: User,
+      // },
     ],
 
     // =========================
