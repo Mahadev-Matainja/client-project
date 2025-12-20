@@ -6,14 +6,16 @@ import vitalStatsReducer from "./slices/vitalStatsSlice";
 import analyticsReducer from "./slices/analyticsSlice";
 import subscriptionReducer from "./slices/activeSubscriptionSlice";
 import doctorSearchReducer from "./slices/doctorSearchSlice";
-import signupReducer from "./slices/signupSlice"
+import signupReducer from "./slices/signupSlice";
+import clinicDoctorsReducer from "./slices/clinicDoctorsSlice";
 const rootReducer = combineReducers({
   auth: authReducer,
   vitalStats: vitalStatsReducer,
   analytics: analyticsReducer,
   subscription: subscriptionReducer,
   doctorSearch: doctorSearchReducer,
-  signup:signupReducer
+  signup: signupReducer,
+  clinicDoctors: clinicDoctorsReducer,
 });
 
 const persistConfig = {

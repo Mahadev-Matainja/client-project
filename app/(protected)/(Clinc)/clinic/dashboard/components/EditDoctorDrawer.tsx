@@ -1,7 +1,13 @@
 "use client";
 
+import { toast } from "@/hooks/use-toast";
+import {
+  DoctorDSheduleDelete,
+  sheduleFetch,
+  SheduleSave,
+} from "@/services/ClinicService";
 import { Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const DAYS = [
   "Sunday",
@@ -15,7 +21,8 @@ const DAYS = [
 ];
 
 type Row = {
-  id: number;
+  id: number; // UI only
+  scheduleId?: number; // backend id
   day: string;
   startTime: string;
   endTime: string;
@@ -31,13 +38,57 @@ const emptyRow = (): Row => ({
 export default function VisitingHoursDrawer({
   open,
   onClose,
+  doctorId,
 }: {
   open: boolean;
   onClose: () => void;
+  doctorId: number | null;
 }) {
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
   const [saved, setSaved] = useState<Row[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [doctorName, setDoctorName] = useState({ fname: "", lname: "" });
 
+  const [selected, setSelected] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
+
+  /* ---------------- FETCH ---------------- */
+  useEffect(() => {
+    if (!doctorId) return;
+
+    const fetchSchedule = async () => {
+      setLoading(true);
+      try {
+        const res = await sheduleFetch(doctorId);
+
+        if (res.success && res.data?.doctors) {
+          const { fname, lname } = res.data.doctors;
+          setDoctorName({ fname, lname });
+        }
+
+        if (res.success && res.data?.doctor_timetables?.length) {
+          const apiRows: Row[] = res.data.doctor_timetables.map((t: any) => ({
+            id: Date.now() + Math.random(),
+            scheduleId: t.id,
+            day: t.day,
+            startTime: t.start_time,
+            endTime: t.end_time,
+          }));
+          setSaved(apiRows);
+        } else {
+          setSaved([]);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSchedule();
+  }, [doctorId]);
+
+  /* ---------------- FORM ---------------- */
   const updateRow = (id: number, key: keyof Row, value: string) => {
     setRows((r) =>
       r.map((row) => (row.id === id ? { ...row, [key]: value } : row))
@@ -45,70 +96,147 @@ export default function VisitingHoursDrawer({
   };
 
   const addRow = () => setRows((r) => [...r, emptyRow()]);
-
   const removeRow = (id: number) =>
     rows.length > 1 && setRows((r) => r.filter((x) => x.id !== id));
 
   const isSaveDisabled = rows.some((r) => !r.startTime || !r.endTime);
 
-  const formatTime = (time: string) => {
-    if (!time) return "";
+  /* ---------------- SAVE ---------------- */
+  const saveRows = async () => {
+    if (!doctorId) return;
 
-    const [h, m] = time.split(":").map(Number);
-    const hour12 = h % 12 || 12;
-    const ampm = h >= 12 ? "PM" : "AM";
+    const validRows = rows.filter((r) => r.startTime && r.endTime);
 
-    return `${hour12}:${m.toString().padStart(2, "0")} ${ampm}`;
-  };
+    if (!validRows.length) {
+      toast({
+        title: "No time slots ❌",
+        description: "Please add at least one visiting hour.",
+      });
+      return;
+    }
 
-  const saveRows = () => {
-    const valid = rows.filter((r) => r.day && r.startTime && r.endTime);
-
-    // if (!valid.length) return alert("Add at least one time slot");
-
-    const expanded = valid.flatMap((r) =>
+    // Expand "All" into all days
+    const payload = validRows.flatMap((r) =>
       r.day === "All"
-        ? DAYS.slice(0, 7).map((d) => ({
-            ...r,
-            id: Date.now() + Math.random(),
-            day: d,
+        ? DAYS.slice(0, 7).map((day) => ({
+            day,
+            startTime: r.startTime,
+            endTime: r.endTime,
           }))
-        : [{ ...r, id: Date.now() + Math.random() }]
+        : [
+            {
+              day: r.day,
+              startTime: r.startTime,
+              endTime: r.endTime,
+            },
+          ]
     );
 
-    setSaved((prev) =>
-      [...prev, ...expanded].filter(
-        (v, i, arr) =>
-          i ===
-          arr.findIndex(
-            (x) =>
-              x.day === v.day &&
-              x.startTime === v.startTime &&
-              x.endTime === v.endTime
-          )
-      )
-    );
+    console.log("Saving schedule 👉", payload);
 
-    setRows([emptyRow()]);
+    try {
+      const res = await SheduleSave(doctorId, payload);
+
+      toast({
+        title: "Saved Successfully 🎉",
+        description: res?.message || "Schedule updated successfully.",
+      });
+
+      // reset form
+      setRows([emptyRow()]);
+      setSelected([]);
+      setSelectAll(false);
+
+      // refresh saved schedules
+      const refreshed = await sheduleFetch(doctorId);
+
+      const updated = refreshed.data.doctor_timetables.map((t: any) => ({
+        id: Date.now() + Math.random(),
+        scheduleId: t.id,
+        day: t.day,
+        startTime: t.start_time,
+        endTime: t.end_time,
+      }));
+
+      setSaved(updated);
+    } catch (err: any) {
+      toast({
+        title: "Save Failed ❌",
+        description: err?.message || "Schedule conflict detected",
+      });
+    }
   };
+
+  /* ---------------- DELETE ---------------- */
+  const handleDeleteRow = async (scheduleId?: number) => {
+    if (!doctorId || !scheduleId) return;
+
+    try {
+      await DoctorDSheduleDelete(doctorId, [scheduleId]);
+      setSaved((prev) => prev.filter((r) => r.scheduleId !== scheduleId));
+      setSelected((prev) => prev.filter((id) => id !== scheduleId));
+
+      toast({ title: "Deleted 🗑️" });
+    } catch (err: any) {
+      toast({
+        title: "Delete Failed ❌",
+        description: err?.message,
+      });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!doctorId || !selected.length) return;
+
+    try {
+      await DoctorDSheduleDelete(doctorId, selected);
+      setSaved((prev) => prev.filter((r) => !selected.includes(r.scheduleId!)));
+      setSelected([]);
+      setSelectAll(false);
+
+      toast({ title: "Deleted Successfully 🗑️" });
+    } catch (err: any) {
+      toast({ title: "Bulk delete failed ❌" });
+    }
+  };
+
+  /* ---------------- SELECT ---------------- */
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelected([]);
+    } else {
+      setSelected(saved.map((r) => r.scheduleId!).filter(Boolean));
+    }
+    setSelectAll(!selectAll);
+  };
+
+  const handleSelectOne = (id?: number) => {
+    if (!id) return;
+    setSelected((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const formatTime = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    const hr = h % 12 || 12;
+    return `${hr}:${m.toString().padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  };
+
+  /* ---------------- UI ---------------- */
+  if (!open) return null;
 
   return (
     <>
-      {open && (
-        <div onClick={onClose} className="fixed inset-0 bg-black/40 z-40" />
-      )}
+      <div onClick={onClose} className="fixed inset-0 bg-black/40 z-40" />
 
-      <div
-        className={`fixed top-0 left-1/2 -translate-x-1/2 w-[700px] h-[70vh] bg-white z-50
-        transition-transform duration-300 overflow-y-auto
-        ${open ? "translate-y-0 top-2 " : "-translate-y-full"}`}
-      >
+      <div className="fixed top-2 left-1/2 -translate-x-1/2 w-[700px] h-[70vh] bg-white z-50 overflow-y-auto">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b sticky top-0 bg-white">
           <h2 className="text-lg font-semibold">
-            Edit schedule of Dr. Basab Mondal
+            Edit schedule of {doctorName.fname} {doctorName.lname}
           </h2>
-          <button onClick={onClose} className="cursor-pointer">
+          <button onClick={onClose}>
             <X />
           </button>
         </div>
@@ -116,11 +244,11 @@ export default function VisitingHoursDrawer({
         {/* Form */}
         <div className="p-6">
           {rows.map((row, i) => (
-            <div key={row.id} className="grid grid-cols-4 gap-4 mb-4 ">
+            <div key={row.id} className="grid grid-cols-4 gap-4 mb-4">
               <select
                 value={row.day}
                 onChange={(e) => updateRow(row.id, "day", e.target.value)}
-                className=" border rounded px-3 py-2"
+                className="border rounded px-3 py-2"
               >
                 {DAYS.map((d) => (
                   <option key={d}>{d}</option>
@@ -141,25 +269,15 @@ export default function VisitingHoursDrawer({
                 className="border rounded px-3 py-2"
               />
 
-              <div className="flex items-center justify-start gap-1">
+              <div className="flex gap-2">
                 {rows.length > 1 && (
-                  <button
-                    onClick={() => removeRow(row.id)}
-                    className="w-5 h-5 flex items-center justify-center
-                 rounded-full border text-red-600 pointer"
-                  >
+                  <button onClick={() => removeRow(row.id)}>
                     <Trash2 size={16} />
                   </button>
                 )}
-
                 {i === rows.length - 1 && (
-                  <button
-                    onClick={addRow}
-                    className="w-5 h-5 flex items-center justify-center
-                 rounded-full bg-blue-600 text-white
-                 hover:bg-blue-700 cursor-pointer"
-                  >
-                    <Plus size={18} />
+                  <button onClick={addRow}>
+                    <Plus size={16} />
                   </button>
                 )}
               </div>
@@ -169,12 +287,7 @@ export default function VisitingHoursDrawer({
           <button
             onClick={saveRows}
             disabled={isSaveDisabled}
-            className={`mt-4 px-6 py-2 rounded font-medium text-white
-    ${
-      isSaveDisabled
-        ? "bg-gray-300 cursor-not-allowed"
-        : "bg-red-600 hover:bg-red-700 cursor-pointer"
-    }`}
+            className="bg-red-600 text-white px-6 py-2 rounded mt-4 disabled:bg-gray-300 cursor-pointer"
           >
             Add to Schedule
           </button>
@@ -182,32 +295,48 @@ export default function VisitingHoursDrawer({
 
         {/* Table */}
         <div className="p-6">
-          <table className="w-full text-sm border">
+          {selected.length > 0 && (
+            <button
+              onClick={handleBulkDelete}
+              className="mb-3 bg-red-600 text-white px-4 py-2 rounded cursor-pointer"
+            >
+              Delete All ({selected.length})
+            </button>
+          )}
+
+          <table className="w-full border text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="p-3 border text-center font-medium">Day</th>
-                <th className="p-3 border text-center font-medium">
-                  Visiting Hours
+                <th className="p-3 border">
+                  <input
+                    type="checkbox"
+                    checked={selectAll}
+                    onChange={handleSelectAll}
+                  />
                 </th>
-                <th className="p-3 border text-center font-medium">Action</th>
+                <th className="p-3 border">Day</th>
+                <th className="p-3 border">Visiting Hours</th>
+                <th className="p-3 border">Action</th>
               </tr>
             </thead>
-
             <tbody>
               {saved.map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="p-3 border font-medium text-center">
-                    {r.day}
+                <tr key={r.id}>
+                  <td className="p-3 border text-center">
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(r.scheduleId!)}
+                      onChange={() => handleSelectOne(r.scheduleId)}
+                    />
                   </td>
+                  <td className="p-3 border text-center">{r.day}</td>
                   <td className="p-3 border text-center">
                     {formatTime(r.startTime)} – {formatTime(r.endTime)}
                   </td>
                   <td className="p-3 border text-center">
                     <button
-                      onClick={() =>
-                        setSaved((s) => s.filter((x) => x.id !== r.id))
-                      }
-                      className="bg-red-600 text-white p-2 rounded hover:bg-red-700 cursor-pointer"
+                      onClick={() => handleDeleteRow(r.scheduleId)}
+                      className="bg-red-600 text-white p-2 rounded cursor-pointer"
                     >
                       <Trash2 size={14} />
                     </button>

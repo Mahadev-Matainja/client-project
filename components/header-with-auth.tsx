@@ -34,10 +34,10 @@ export default function HeaderWithAuth({
     setAuthModalOpen(true);
   };
 
-  const openSignUp = () => {
-    setAuthMode("signup");
-    setAuthModalOpen(true);
-  };
+  // const openSignUp = () => {
+  //   setAuthMode("signup");
+  //   setAuthModalOpen(true);
+  // };
 
   // Extract customer info safely
   const customer = session?.user?.data?.customer;
@@ -133,12 +133,23 @@ export default function HeaderWithAuth({
                   <Button
                     variant="outline"
                     onClick={openSignIn}
-                    className="bg-transparent"
+                    className="bg-transparent cursor-pointer"
                   >
                     Sign In
                   </Button>
-                  <Button onClick={openSignUp}>
+                  {/* <Button onClick={openSignUp}>
                     {" "}
+                    Get Your Basic Health Score
+                  </Button> */}
+                  <Button
+                    className="cursor-pointer"
+                    onClick={() =>
+                      window.open(
+                        "https://www.myhealthscore.com/healthquiz",
+                        "_blank"
+                      )
+                    }
+                  >
                     Get Your Basic Health Score
                   </Button>
                 </div>

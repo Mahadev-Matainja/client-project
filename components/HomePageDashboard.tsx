@@ -11,6 +11,16 @@ import BannerWithoutAuth from "@/components/banner-without-auth";
 import ServiceCard from "@/components/ServiceCard";
 
 export default function HomePageDashboard() {
+  const router = useRouter();
+
+  const handleClick = () => {
+    router.push("/consumers"); // redirect to /consumers
+  };
+
+  const handleRightClick = () => {
+    router.push("/Providers"); // redirect to /Providers
+  };
+
   const serviceData = [
     {
       title: "Point of Care Health Monitoring",
@@ -94,7 +104,7 @@ export default function HomePageDashboard() {
                       <span className="text-red-600">Consumers</span>
                     </h2>
 
-                    <div className="flex">
+                    <div className="flex" onClick={handleClick}>
                       <ul className="space-y-3 text-sm text-gray-700 text-left">
                         {[
                           "Healthy Individuals",
@@ -134,7 +144,7 @@ export default function HomePageDashboard() {
                       <span className="text-blue-600">Providers</span>
                     </h2>
 
-                    <div className="flex ">
+                    <div className="flex " onClick={handleRightClick}>
                       <ul className="space-y-3 text-sm text-gray-700 text-left">
                         {[
                           "Medical Practitioners",
